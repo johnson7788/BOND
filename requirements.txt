@@ -1,0 +1,5 @@
+transformers==2.9.0
+torch==1.2.0
+flashtool==0.0.10
+tensorboardX==1.8
+psutil
