@@ -425,52 +425,51 @@ def main():
         default=None,
         type=str,
         required=True,
-        help="The input data dir. Should contain the training files for the CoNLL-2003 NER task.",
+        help="输入数据目录。应该包含CoNLL-2003 NER任务的训练文件",
     )
     parser.add_argument(
         "--model_type",
         default=None,
         type=str,
         required=True,
-        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
+        help="列表中选择的模型类型: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,
         required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(ALL_MODELS),
+        help="列表中选择的预训练模型或快捷方式名称的路径: " + ", ".join(ALL_MODELS),
     )
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help="输出目录, 将在其中写入模型预测和checkpoint",
     )
 
     # Other parameters
     parser.add_argument(
-        "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name"
+        "--config_name", default="", type=str, help="预训练的配置名称或路径(如果与model_name不同)"
     )
     parser.add_argument(
         "--tokenizer_name",
         default="",
         type=str,
-        help="Pretrained tokenizer name or path if not the same as model_name",
+        help="预训练的tokenizer名称或路径(如果与model_name不同)",
     )
     parser.add_argument(
         "--cache_dir",
         default="",
         type=str,
-        help="Where do you want to store the pre-trained models downloaded from s3",
+        help="您想在哪里存储从s3下载的预训练模型",
     )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.",
+        help="tokenization后的最大总输入序列长度。长度大于此长度的序列将被截断，较短的序列将被填充。",
     )
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
@@ -478,21 +477,21 @@ def main():
     parser.add_argument(
         "--evaluate_during_training",
         action="store_true",
-        help="Whether to run evaluation during training at each logging step.",
+        help="是否在每个日志记录step的训练期间进行评估.",
     )
     parser.add_argument(
-        "--do_lower_case", action="store_true", help="Set this flag if you are using an uncased model."
+        "--do_lower_case", action="store_true", help="如果使用的是uncased的模型，请设置此标志"
     )
 
-    parser.add_argument("--per_gpu_train_batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--per_gpu_train_batch_size", default=8, type=int, help="训练时每个GPU / CPU的批次大小。")
     parser.add_argument(
-        "--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for evaluation."
+        "--per_gpu_eval_batch_size", default=8, type=int, help="评估时每个GPU / CPU的批次大小。"
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
         default=1,
-        help="Number of updates steps to accumulate before performing a backward/update pass.",
+        help="在执行向后/更新过程之前要梯度累积的更新步骤数。",
     )
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
@@ -501,13 +500,13 @@ def main():
     parser.add_argument("--adam_beta2", default=0.999, type=float, help="BETA2 for Adam optimizer.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
     parser.add_argument(
-        "--num_train_epochs", default=3.0, type=float, help="Total number of training epochs to perform."
+        "--num_train_epochs", default=3.0, type=float, help="要执行的训练epoch总数。"
     )
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help="If > 0: 设置要执行的训练步骤总数。覆盖num_train_epochs。",
     )
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
 
@@ -563,15 +562,16 @@ def main():
     parser.add_argument('--vat_loss_type', default="logits", type=str, help="subject to measure model difference, choices = [embeds, logits(default)].")
 
     # self-training
-    parser.add_argument('--self_training_reinit', type = int, default = 0, help = 're-initialize the student model if the teacher model is updated.')
-    parser.add_argument('--self_training_begin_step', type = int, default = 900, help = 'the begin step (usually after the first epoch) to start self-training.')
-    parser.add_argument('--self_training_label_mode', type = str, default = "hard", help = 'pseudo label type. choices:[hard(default), soft].')
+    parser.add_argument('--self_training_reinit', type = int, default = 0, help = '如果teacher模型已更新，重新初始化student模型。')
+    parser.add_argument('--self_training_begin_step', type = int, default = 900, help = '开始步骤(通常在第一个epoch之后)开始self-training。')
+    parser.add_argument('--self_training_label_mode', type = str, default = "hard", help = '伪标签类型. choices:[hard(default), soft].')
     parser.add_argument('--self_training_period', type = int, default = 878, help = 'the self-training period.')
     parser.add_argument('--self_training_hp_label', type = float, default = 0, help = 'use high precision label.')
     parser.add_argument('--self_training_ensemble_label', type = int, default = 0, help = 'use ensemble label.')
 
     args = parser.parse_args()
 
+    # 决定是否覆盖已有的output目录
     if (
         os.path.exists(args.output_dir)
         and os.listdir(args.output_dir)
@@ -584,7 +584,7 @@ def main():
             )
         )
 
-    # Create output directory if needed
+    # 如果outputs目录不存在，那么创建
     if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(args.output_dir)
     # Setup distant debugging if needed
@@ -617,7 +617,7 @@ def main():
     logging_fh.setLevel(logging.DEBUG)
     logger.addHandler(logging_fh)
     logger.warning(
-        "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
+        "处理的 rank: %s, device: %s, n_gpu: %s, 是否分布式训练: %s, 是否 16-bits 训练 : %s",
         args.local_rank,
         device,
         args.n_gpu,
@@ -627,12 +627,13 @@ def main():
 
     # Set seed
     set_seed(args)
+    # 获取这个数据的所有labels.  eg: ['O', 'B-LOC', 'B-ORG', 'B-PER', 'B-MISC', 'I-PER', 'I-MISC', 'I-ORG', 'I-LOC', '<START>', '<STOP>']
     labels = get_labels(args.data_dir)
     num_labels = len(labels)
-    # Use cross entropy ignore index as padding label id so that only real label ids contribute to the loss later
+    # 使用交叉熵, 忽略索引作为padding label ID，以便以后真实标签ID去计算损失, eg: pad_token_label_id = -100
     pad_token_label_id = CrossEntropyLoss().ignore_index
 
-    # Load pretrained model and tokenizer
+    # 加载预训练模型
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
@@ -652,9 +653,9 @@ def main():
     if args.local_rank == 0:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
-    logger.info("Training/evaluation parameters %s", args)
+    logger.info("训练/评估 参数 %s", args)
 
-    # Training
+    # 开始训练
     if args.do_train:
         train_dataset = load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode="train")
         model, global_step, tr_loss, best_dev, best_test = train(args, train_dataset, model_class, config, tokenizer, labels, pad_token_label_id)

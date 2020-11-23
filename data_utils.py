@@ -27,13 +27,12 @@ class InputExample(object):
     """A single training/test example for token classification."""
 
     def __init__(self, guid, words, labels, hp_labels):
-        """Constructs a InputExample.
+        """构建一个输入的样本.
 
         Args:
-            guid: Unique id for the example.
-            words: list. The words of the sequence.
-            labels: (Optional) list. The labels for each word of the sequence. This should be
-            specified for train and dev examples, but not for test examples.
+            guid: 样本的唯一ID.
+            words: list. 单词组成的序列.
+            labels: (Optional) list. 序列中每个单词的标签。这应该是指定用于训练和开发样本，但不用于测试样本.
         """
         self.guid = guid
         self.words = words
@@ -53,20 +52,29 @@ class InputFeatures(object):
         self.hp_label_ids = hp_label_ids
 
 def read_examples_from_file(data_dir, mode):
-    
+    """
+    读取文件
+    :param data_dir:  eg:  'dataset/conll03_distant/'
+    :param mode: eg: train or test
+    :return:
+    """
     file_path = os.path.join(data_dir, "{}.json".format(mode))
+    #样本索引从1开始
     guid_index = 1
+    #用于保存所有样本
     examples = []
 
     with open(file_path, 'r') as f:
         data = json.load(f)
-        
+        #迭代每条数据
         for item in data:
             words = item["str_words"]
             labels = item["tags"]
+            # 是否存在高精度的high precision label
             if "tags_hp" in labels:
                 hp_labels = item["tags_hp"]
             else:
+                # 如果不存在，就设为None
                 hp_labels = [None]*len(labels)
             examples.append(InputExample(guid="%s-%d".format(mode, guid_index), words=words, labels=labels, hp_labels=hp_labels))
             guid_index += 1
@@ -92,11 +100,29 @@ def convert_examples_to_features(
     mask_padding_with_zero=True,
     show_exnum = -1,
 ):
-    """ Loads a data file into a list of `InputBatch`s
+    """
+    把examples转换成 features
         `cls_token_at_end` define the location of the CLS token:
             - False (Default, BERT/XLM pattern): [CLS] + A + [SEP] + B + [SEP]
             - True (XLNet/GPT pattern): A + [SEP] + B + [SEP] + [CLS]
         `cls_token_segment_id` define the segment id associated to the CLS token (0 for BERT, 2 for XLNet)
+    :param examples: 由InputExample组成的样本列表
+    :param label_list:  
+    :param max_seq_length:
+    :param tokenizer:
+    :param cls_token_at_end:
+    :param cls_token:
+    :param cls_token_segment_id:
+    :param sep_token:
+    :param sep_token_extra:
+    :param pad_on_left:
+    :param pad_token:
+    :param pad_token_segment_id:
+    :param pad_token_label_id:
+    :param sequence_a_segment_id:
+    :param mask_padding_with_zero:
+    :param show_exnum:
+    :return:
     """
     features = []
     extra_long_samples = 0
@@ -217,11 +243,18 @@ def convert_examples_to_features(
 
 
 def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode):
-    
+    """
+    :param args: argparse参数
+    :param tokenizer:  初始化的tokenizer
+    :param labels:  eg: ['O', 'B-LOC', 'B-ORG', 'B-PER', 'B-MISC', 'I-PER', 'I-MISC', 'I-ORG', 'I-LOC', '<START>', '<STOP>']
+    :param pad_token_label_id:  eg : -100
+    :param mode:  eg: train or test
+    :return:
+    """
     if args.local_rank not in [-1, 0] and not evaluate:
         torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-    # Load data features from cache or dataset file
+    # cache文件名字
     cached_features_file = os.path.join(
         args.data_dir,
         "cached_{}_{}_{}".format(
@@ -230,11 +263,13 @@ def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode):
     )
 
     if os.path.exists(cached_features_file) and not args.overwrite_cache:
-        logger.info("Loading features from cached file %s", cached_features_file)
+        logger.info("从cache文件中加载features %s", cached_features_file)
         features = torch.load(cached_features_file)
     else:
-        logger.info("Creating features from dataset file at %s", args.data_dir)
+        logger.info("未发现cache文件，开始从源文件创建features %s", args.data_dir)
+        # 读取样本
         examples = read_examples_from_file(args.data_dir, mode)
+        #样本转换成features
         features = convert_examples_to_features(
             examples,
             labels,
@@ -273,6 +308,11 @@ def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode):
     return dataset
 
 def get_labels(path = None):
+    """
+    获取所有labels， 如果存在tag_to_id.json,那么读取后获取，否则直接返回设置好的
+    :param path: 数据集目录： eg: 'dataset/conll03_distant/'
+    :return:
+    """
     if path and os.path.exists(path + "tag_to_id.json"):
         labels = []
         with open(path + "tag_to_id.json", "r") as f:
