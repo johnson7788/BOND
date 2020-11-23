@@ -18,6 +18,26 @@
 - *Previous SOTA*: BiLSTM-CRF/AutoNER/LR-CRF/KALM/CONNET
 
 
+## 目录
+```buildoutcfg
+├── LICENSE
+├── README.md
+├── data_utils.py
+├── dataset
+├── docs
+├── eval.py
+├── model_utils.py
+├── modeling_roberta.py
+├── outputs/
+    └── conll03  模型输出
+├── pretrained_model  保存transformers下载的预训练模型
+├── requirements.txt   python依赖
+├── run_ner.py
+├── run_self_training_ner.py
+├── scripts
+└── venv   #环境文件
+```
+
 ## Data
 我们在这里发布了五个开放域的远距离/弱标签的NER数据集: [dataset](dataset)
 ```buildoutcfg
