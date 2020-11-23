@@ -107,12 +107,12 @@ def convert_examples_to_features(
             - True (XLNet/GPT pattern): A + [SEP] + B + [SEP] + [CLS]
         `cls_token_segment_id` define the segment id associated to the CLS token (0 for BERT, 2 for XLNet)
     :param examples: 由InputExample组成的样本列表
-    :param label_list:  
-    :param max_seq_length:
-    :param tokenizer:
-    :param cls_token_at_end:
-    :param cls_token:
-    :param cls_token_segment_id:
+    :param label_list:   eg:['O', 'B-LOC', 'B-ORG', 'B-PER', 'B-MISC', 'I-PER', 'I-MISC', 'I-ORG', 'I-LOC', '<START>', '<STOP>']
+    :param max_seq_length:  eg: 128
+    :param tokenizer:  eg: 加载好的tokenzier
+    :param cls_token_at_end: cls是否在末尾，还是在开头
+    :param cls_token:  使用的CLS token标识符，eg: [CLS] 或 '<s>'
+    :param cls_token_segment_id:  默认cls token使用的id  eg: 0
     :param sep_token:
     :param sep_token_extra:
     :param pad_on_left:
@@ -242,7 +242,7 @@ def convert_examples_to_features(
     return features
 
 
-def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode):
+def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode, evaluate=False):
     """
     :param args: argparse参数
     :param tokenizer:  初始化的tokenizer
