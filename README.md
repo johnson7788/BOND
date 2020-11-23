@@ -17,6 +17,11 @@
 - *Full Supervision*: Roberta Finetuning/BiLSTM CRF
 - *Previous SOTA*: BiLSTM-CRF/AutoNER/LR-CRF/KALM/CONNET
 
+## 依赖
+```buildoutcfg
+python 3.7
+pip install -r requirements.txt
+```
 
 ## 目录
 ```buildoutcfg
