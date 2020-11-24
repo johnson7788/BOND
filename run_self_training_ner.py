@@ -595,10 +595,10 @@ def main():
 
     # self-training
     parser.add_argument('--self_training_reinit', type = int, default = 0, help = '如果teacher模型已更新，是否重新初始化student模型。0表示重启重新初始化，1表示不初始化')
-    parser.add_argument('--self_training_begin_step', type = int, default = 900, help = '开始步骤(通常在第一个epoch之后)开始self-training。')
+    parser.add_argument('--self_training_begin_step', type = int, default = 900, help = '开始步骤(通常在第一个epoch之后)开始self-training。对应论文中的第一阶段早停策略')
     parser.add_argument('--self_training_label_mode', type = str, default = "hard", help = '伪标签类型. choices:[hard(default), soft]. 软标签是一个teacher模型预测出来的，类似logits的概率值，是浮点数，硬标签直接就是整数，就是对应概率最大的位置的索引，例如soft是0.82, hard就是1')
     parser.add_argument('--self_training_period', type = int, default = 878, help = 'the self-training period., 每训练多少个step后，更新一下teacher模型')
-    parser.add_argument('--self_training_hp_label', type = float, default = 0, help = 'use high precision label.')
+    parser.add_argument('--self_training_hp_label', type = float, default = 0, help = '是否使用高置信度标签重新加权软标签')
     parser.add_argument('--self_training_ensemble_label', type = int, default = 0, help = 'use ensemble label.')
 
     args = parser.parse_args()

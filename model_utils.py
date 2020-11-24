@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 def soft_frequency(logits, power=2, probs=False):
     """
+    对应论文公式6： https://zhuanlan.zhihu.com/p/307454757/
     Unsupervised Deep Embedding for Clustering Analysis
     https://arxiv.org/abs/1511.06335
     :param logits:
@@ -44,9 +45,10 @@ def soft_frequency(logits, power=2, probs=False):
 
 def multi_source_label_refine(args, hp_labels, combined_labels, pred_labels, pad_token_label_id, pred_logits=None):
     """
-
+    是否使用高置信度标签重新加权软标签
+    self_training_hp_label 在6和7之间代表着论文中的公式8,https://zhuanlan.zhihu.com/p/307454757/
     :param args: argparse
-    :param hp_labels:  高精度label
+    :param hp_labels:  高置信度label
     :param combined_labels: 用的真实的labels
     :param pred_labels: teacher模型预测出来的labels
     :param pad_token_label_id: eg: -100
