@@ -12,6 +12,7 @@ ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP = {
     "roberta-large-openai-detector": "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-openai-detector-pytorch_model.bin",
 }
 
+
 class RobertaForTokenClassification_v2(BertPreTrainedModel):
     r"""
         **labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size, sequence_length)``:
@@ -42,27 +43,33 @@ class RobertaForTokenClassification_v2(BertPreTrainedModel):
     base_model_prefix = "roberta"
 
     def __init__(self, config):
+        """
+        :param config:  模型的配置
+        """
         super().__init__(config)
         self.num_labels = config.num_labels
-
+        # 加载模型配置，初始化一个roberta模型
         self.roberta = RobertaModel(config)
+        # 初始化一个dropout和自定义分类层
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
+        # 调用transformers的自对应初始化权重函数
         self.init_weights()
 
-    def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        label_mask=None,
-    ):
-
+    def forward( self,input_ids=None,attention_mask=None,token_type_ids=None,position_ids=None,
+                 head_mask=None, inputs_embeds=None, labels=None, label_mask=None,):
+        """
+        :param input_ids: 输入的id
+        :param attention_mask:
+        :param token_type_ids: segment id
+        :param position_ids: 模型使用position_id来识别哪个token在哪个位置
+        :param head_mask:
+        :param inputs_embeds:
+        :param labels:
+        :param label_mask:
+        :return:
+        """
+        #首先调用原始的roberta的模型，得到输出, 返回 [last_hidden_states, pooled_output, hidden_states, attentions]
         outputs = self.roberta(
             input_ids,
             attention_mask=attention_mask,
@@ -71,25 +78,26 @@ class RobertaForTokenClassification_v2(BertPreTrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
         )
-
+        #获取last_hidden_states作为特征
         final_embedding = outputs[0]
         sequence_output = self.dropout(final_embedding)
         logits = self.classifier(sequence_output)
-
-        outputs = (logits, final_embedding, ) + outputs[2:]  # add hidden states and attention if they are here
+        # 输出为 [logits, final_embedding, hidden_states, attentions]
+        outputs = (logits, final_embedding,) + outputs[2:]  # add hidden states and attention if they are here
         if labels is not None:
-
-            # Only keep active parts of the loss
+            # 训练模式
+            # 只计算我们关注的token的损失,
             if attention_mask is not None or label_mask is not None:
                 active_loss = True
                 if attention_mask is not None:
                     active_loss = attention_mask.view(-1) == 1
                 if label_mask is not None:
                     active_loss = active_loss & label_mask.view(-1)
+                # 取到未mask的logits，进行下一步计算损失
                 active_logits = logits.view(-1, self.num_labels)[active_loss]
-
-
+            # 判断形状相同， eg: labels.shape torch.Size([16, 128])  [batch_size,seq_length]   logits.shape: torch.Size([16, 128, 11])  [batch_size,seq_length, num_class]
             if labels.shape == logits.shape:
+                #散度损失. 有mask，就用mask的计算损失，否则计算所有损失
                 loss_fct = KLDivLoss()
                 if attention_mask is not None or label_mask is not None:
                     active_labels = labels.view(-1, self.num_labels)[active_loss]
@@ -100,11 +108,11 @@ class RobertaForTokenClassification_v2(BertPreTrainedModel):
                 loss_fct = CrossEntropyLoss()
                 if attention_mask is not None or label_mask is not None:
                     active_labels = labels.view(-1)[active_loss]
+                    # 一个批次计算损失 eg: active_logits.shape: torch.Size([485, 11]),  active_labels.shape: 485
                     loss = loss_fct(active_logits, active_labels)
                 else:
                     loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-
-
+            #把损失也加入到outputs
             outputs = (loss,) + outputs
 
-        return outputs  # (loss), scores, final_embedding, (hidden_states), (attentions)
+        return outputs  # (loss), logits, final_embedding, (hidden_states), (attentions)

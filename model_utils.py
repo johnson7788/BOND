@@ -26,6 +26,10 @@ def soft_frequency(logits, power=2, probs=False):
     """
     Unsupervised Deep Embedding for Clustering Analysis
     https://arxiv.org/abs/1511.06335
+    :param logits:
+    :param power: 对y进行几次幂
+    :param probs:  使用概率值还是logits做为y
+    :return:
     """
     if not probs:
         softmax = torch.nn.Softmax(dim=1)
@@ -39,7 +43,16 @@ def soft_frequency(logits, power=2, probs=False):
     return p
 
 def multi_source_label_refine(args, hp_labels, combined_labels, pred_labels, pad_token_label_id, pred_logits=None):
+    """
 
+    :param args: argparse
+    :param hp_labels:  高精度label
+    :param combined_labels: 用的真实的labels
+    :param pred_labels: teacher模型预测出来的labels
+    :param pad_token_label_id: eg: -100
+    :param pred_logits:
+    :return:
+    """
     if args.self_training_label_mode == "hard":
         if args.self_training_hp_label == 0:
             pass
@@ -103,7 +116,14 @@ def multi_source_label_refine(args, hp_labels, combined_labels, pred_labels, pad
         return pred_labels, label_mask
 
 def get_mt_loss(s_logits, t_logits, class_name, _lambda):
-    
+    """
+    在mt模式下计算 mean teacher loss
+    :param s_logits:
+    :param t_logits:
+    :param class_name:
+    :param _lambda:
+    :return:
+    """
     if class_name is None:
         return 0
     s_logits = s_logits.view(-1, s_logits.size(-1)).float()
@@ -131,7 +151,15 @@ def get_mt_loss(s_logits, t_logits, class_name, _lambda):
         return -(prob_tea*logprob_stu).sum(-1).mean()*_lambda
 
 def mt_update(t_params, s_params, average="exponential", alpha=0.995, step=None):
-
+    """
+    mt方法下，更新teacher模型和student模型的参数
+    :param t_params:
+    :param s_params:
+    :param average:
+    :param alpha:
+    :param step:
+    :return:
+    """
     for (t_name, t_param), (s_name, s_param) in zip(t_params, s_params):
         if t_name != s_name:
             logger.error("t_name != s_name: {} {}".format(t_name, s_name))
@@ -145,7 +173,13 @@ def mt_update(t_params, s_params, average="exponential", alpha=0.995, step=None)
             t_param.data.add_(diff)
 
 def opt_grad(loss, in_var, optimizer):
-    
+    """
+    vat方法下的优化梯度, 对标量loss进行缩放
+    :param loss:
+    :param in_var:
+    :param optimizer:
+    :return:
+    """
     if hasattr(optimizer, 'scalar'):
         loss = loss * optimizer.scaler.loss_scale
     return torch.autograd.grad(loss, in_var)

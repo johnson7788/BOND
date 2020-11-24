@@ -76,7 +76,7 @@ def read_examples_from_file(data_dir, mode):
             else:
                 # 如果不存在，就设为None
                 hp_labels = [None]*len(labels)
-            examples.append(InputExample(guid="%s-%d".format(mode, guid_index), words=words, labels=labels, hp_labels=hp_labels))
+            examples.append(InputExample(guid=f"{mode}-{guid_index}", words=words, labels=labels, hp_labels=hp_labels))
             guid_index += 1
     
     return examples
@@ -98,7 +98,7 @@ def convert_examples_to_features(
     pad_token_label_id=-100,
     sequence_a_segment_id=0,
     mask_padding_with_zero=True,
-    show_exnum = -1,
+    show_exnum = 5,
 ):
     """
     把examples转换成 features
@@ -113,38 +113,44 @@ def convert_examples_to_features(
     :param cls_token_at_end: cls是否在末尾，还是在开头
     :param cls_token:  使用的CLS token标识符，eg: [CLS] 或 '<s>'
     :param cls_token_segment_id:  默认cls token使用的id  eg: 0
-    :param sep_token:
-    :param sep_token_extra:
-    :param pad_on_left:
-    :param pad_token:
-    :param pad_token_segment_id:
-    :param pad_token_label_id:
-    :param sequence_a_segment_id:
+    :param sep_token:  默认是 [SEP] eg: '</s>'
+    :param sep_token_extra:  bool eg: True
+    :param pad_on_left: 从左面开始padding
+    :param pad_token:   用padding的值， eg: 1
+    :param pad_token_segment_id:   pad 的segment的id，属于哪个段落 eg:0
+    :param pad_token_label_id:   # pad token 对应的label id  eg:-100
+    :param sequence_a_segment_id:   序列a的segment 的id  eg:0
     :param mask_padding_with_zero:
-    :param show_exnum:
+    :param show_exnum: 显示几条样本, 默认显示前5条
     :return:
     """
     features = []
+    # 记录超过最大长度的样本格式
     extra_long_samples = 0
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10000 == 0:
-            logger.info("Writing example %d of %d", ex_index, len(examples))
+            logger.info("已经写入10000条样本 %d of %d", ex_index, len(examples))
 
         tokens = []
         label_ids = []
         full_label_ids = []
         hp_label_ids = []
         for word, label, hp_label in zip(example.words, example.labels, example.hp_labels):
+            # 单词tokenzier, 有的单词会被拆分，例如 Blackburn --> ["Black", "burn"]， 那么full_label_ids就会记录这个问题
             word_tokens = tokenizer.tokenize(word)
             tokens.extend(word_tokens)
-            # Use the real label id for the first token of the word, and padding ids for the remaining tokens
+            # 对word的第一个字使用真实的label id，后面其它的字，使用pad id. eg: ["Black", "burn"] --> [5, -100]
             label_ids.extend([label] + [pad_token_label_id] * (len(word_tokens) - 1))
+            # 如果hp_label是None，那么就使用pad_token_label_id, 否则就使用hp_label的一个真实id，然后其它用pad id  eg: ["Black", "burn"] -->[-100, -100]
             hp_label_ids.extend([hp_label if hp_label is not None else pad_token_label_id] + [pad_token_label_id] * (len(word_tokens) - 1))
+            # 那么完全label: ["Black", "burn"] --> [5 5]
             full_label_ids.extend([label] * len(word_tokens) )
 
-        # Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
+        # 特殊token等于3,如果sep_token_extra为True，因为roberta的特殊token是3个， Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
         special_tokens_count = 3 if sep_token_extra else 2
+        # 如果实际的token个数大于序列最大长度减去特殊长度，Roberta的特殊token一共有3个
         if len(tokens) > max_seq_length - special_tokens_count:
+            # 开始截断tokens
             tokens = tokens[: (max_seq_length - special_tokens_count)]
             label_ids = label_ids[: (max_seq_length - special_tokens_count)]
             hp_label_ids = hp_label_ids[: (max_seq_length - special_tokens_count)]
@@ -174,7 +180,8 @@ def convert_examples_to_features(
         hp_label_ids += [pad_token_label_id]
         full_label_ids += [pad_token_label_id]
         if sep_token_extra:
-            # roberta uses an extra separator b/w pairs of sentences
+            # roberta 使用额外的分开的b/w 句子对, roberta uses an extra separator b/w pairs of sentences
+            # eg: ['EU', 're', 'ject', 's', 'German', 'call', 'to', 'boy', 'cott', 'British', 'lam', 'b', '.', '</s>', '</s>']
             tokens += [sep_token]
             label_ids += [pad_token_label_id]
             hp_label_ids += [pad_token_label_id]
@@ -193,14 +200,13 @@ def convert_examples_to_features(
             hp_label_ids = [pad_token_label_id] + hp_label_ids
             full_label_ids = [pad_token_label_id] + full_label_ids
             segment_ids = [cls_token_segment_id] + segment_ids
-
+        #token 转换成id,  eg: [-100, 2, 0, -100, -100, 0, 0, 0, 0, -100, 0, 0, -100, 0, -100, -100]
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
 
-        # The mask has 1 for real tokens and 0 for padding tokens. Only real
-        # tokens are attended to.
+        # mask的真实签为1，填充标签为0。仅关注真实token.
         input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
-        # Zero-pad up to the sequence length.
+        # Zero-pad 到最大序列长度
         padding_length = max_seq_length - len(input_ids)
         if pad_on_left:
             input_ids = ([pad_token] * padding_length) + input_ids
@@ -225,7 +231,7 @@ def convert_examples_to_features(
         assert len(full_label_ids) == max_seq_length
 
         if ex_index < show_exnum:
-            logger.info("*** Example ***")
+            logger.info(f"*** Example {ex_index} ***")
             logger.info("guid: %s", example.guid)
             logger.info("tokens: %s", " ".join([str(x) for x in tokens]))
             logger.info("input_ids: %s", " ".join([str(x) for x in input_ids]))
@@ -238,7 +244,7 @@ def convert_examples_to_features(
         features.append(
             InputFeatures(input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids, label_ids=label_ids, full_label_ids=full_label_ids, hp_label_ids=hp_label_ids)
         )
-    logger.info("Extra long example %d of %d", extra_long_samples, len(examples))
+    logger.info("超过最大序列长度的样本个数有%d，总样本数有%d", extra_long_samples, len(examples))
     return features
 
 
@@ -269,7 +275,7 @@ def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode, e
         logger.info("未发现cache文件，开始从源文件创建features %s", args.data_dir)
         # 读取样本
         examples = read_examples_from_file(args.data_dir, mode)
-        #样本转换成features
+        #样本转换成features, 一条样本包含 guid, tokens, input_ids, input_mask, segment_ids, 可选 label_ids, hp_label_ids, full_label_ids
         features = convert_examples_to_features(
             examples,
             labels,
@@ -295,13 +301,14 @@ def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode, e
     if args.local_rank == 0 and not evaluate:
         torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-    # Convert to Tensors and build dataset
+    # 所有样本转换成tensor
     all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
     all_label_ids = torch.tensor([f.label_ids for f in features], dtype=torch.long)
     all_full_label_ids = torch.tensor([f.full_label_ids for f in features], dtype=torch.long)
     all_hp_label_ids = torch.tensor([f.hp_label_ids for f in features], dtype=torch.long)
+    # 样本的id，eg: [1,2,3,...,14040]
     all_ids = torch.tensor([f for f in range(len(features))], dtype=torch.long)
 
     dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids, all_full_label_ids, all_hp_label_ids, all_ids)

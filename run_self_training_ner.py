@@ -71,7 +71,7 @@ ALL_MODELS = sum(
     ),
     (),
 )
-
+# 这里roberta使用了自定义的model
 MODEL_CLASSES = {
     "bert": (BertConfig, BertForTokenClassification, BertTokenizer),
     "roberta": (RobertaConfig, RobertaForTokenClassification_v2, RobertaTokenizer),
@@ -88,17 +88,25 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 def initialize(args, model_class, config, t_total, epoch):
-
+    """
+    初始化模型
+    :param args:
+    :param model_class: # huggface的model 类别，用于加载模型
+    :param config: 模型配置
+    :param t_total: 总的steps
+    :param epoch: 训练的epoch
+    :return:  model, optimizer, scheduler
+    """
     model = model_class.from_pretrained(
         args.model_name_or_path,
         from_tf=bool(".ckpt" in args.model_name_or_path),
         config=config,
         cache_dir=args.cache_dir if args.cache_dir else None,
     )
-
+    # 模型到GPU
     model.to(args.device)
 
-    # Prepare optimizer and schedule (linear warmup and decay)
+    # 模型参数， Prepare optimizer and schedule (linear warmup and decay)
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
@@ -107,13 +115,15 @@ def initialize(args, model_class, config, t_total, epoch):
         },
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
     ]
+    #优化器
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, \
             eps=args.adam_epsilon, betas=(args.adam_beta1,args.adam_beta2))
+    # 学习率scheduler
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
     )
 
-    # Check if saved optimizer or scheduler states exist
+    # 如果已经存在optimizer or scheduler，那么加载已存在的
     if epoch == 0:
         if os.path.isfile(os.path.join(args.model_name_or_path, "optimizer.pt")) and os.path.isfile(
             os.path.join(args.model_name_or_path, "scheduler.pt")
@@ -121,7 +131,7 @@ def initialize(args, model_class, config, t_total, epoch):
             # Load in optimizer and scheduler states
             optimizer.load_state_dict(torch.load(os.path.join(args.model_name_or_path, "optimizer.pt")))
             scheduler.load_state_dict(torch.load(os.path.join(args.model_name_or_path, "scheduler.pt")))
-
+    #混合精度训练
     if args.fp16:
         try:
             from apex import amp
@@ -129,7 +139,7 @@ def initialize(args, model_class, config, t_total, epoch):
             raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
         model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
 
-    # Multi-gpu training (should be after apex fp16 initialization)
+    # 多GPU，Multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
         model = torch.nn.DataParallel(model)
 
@@ -138,20 +148,32 @@ def initialize(args, model_class, config, t_total, epoch):
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[args.local_rank], output_device=args.local_rank, find_unused_parameters=True
         )
-
+    #清空梯度
     model.zero_grad()
     return model, optimizer, scheduler
 
 def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token_label_id):
-    """ Train the model """
+    """
+    训练模型
+    :param args: argparse参数
+    :param train_dataset:  训练集Dataset
+    :param model_class: 加载好的model
+    :param config: model配置
+    :param tokenizer: 加载好的tokenizer
+    :param labels:  所有的labels, eg: ['O', 'B-LOC', 'B-ORG', 'B-PER', 'B-MISC', 'I-PER', 'I-MISC', 'I-ORG', 'I-LOC', '<START>', '<STOP>']
+    :param pad_token_label_id: pad token对应的label的id eg:-100
+    :return:
+    """
 
     if args.local_rank in [-1, 0]:
         tb_writer = SummaryWriter(os.path.join(args.output_dir,'tfboard'))
-
+    #计算batch_size
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
+    # 随机采样的方式
     train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
+    # 定义Dataloader，设置采样方式和batch_size
     train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
-
+    #计算总的steps
     if args.max_steps > 0:
         t_total = args.max_steps
         args.num_train_epochs = args.max_steps // (len(train_dataloader) // args.gradient_accumulation_steps) + 1
@@ -160,27 +182,30 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
 
     model, optimizer, scheduler = initialize(args, model_class, config, t_total, 0)
     # Train!
-    logger.info("***** Running training *****")
-    logger.info("  Num examples = %d", len(train_dataset))
-    logger.info("  Num Epochs = %d", args.num_train_epochs)
-    logger.info("  Instantaneous batch size per GPU = %d", args.per_gpu_train_batch_size)
+    logger.info("***** 开始训练 *****")
+    logger.info("  样本总数 = %d", len(train_dataset))
+    logger.info("  Epochs总数 = %d", args.num_train_epochs)
+    logger.info("  每个GPU的Batch size = %d", args.per_gpu_train_batch_size)
     logger.info(
         "  Total train batch size (w. parallel, distributed & accumulation) = %d",
         args.train_batch_size
         * args.gradient_accumulation_steps
         * (torch.distributed.get_world_size() if args.local_rank != -1 else 1),
     )
-    logger.info("  Gradient Accumulation steps = %d", args.gradient_accumulation_steps)
-    logger.info("  Total optimization steps = %d", t_total)
+    logger.info("  梯度累积步数 = %d", args.gradient_accumulation_steps)
+    logger.info("  总步数 = %d", t_total)
 
     global_step = 0
     epochs_trained = 0
     steps_trained_in_current_epoch = 0
-    # Check if continuing training from a checkpoint
+    # 检查是否从一个checkpoint继续训练,  重新设置global_step,epochs_trained,steps_trained_in_current_epoch
+    # 需要你把自动加载model_name_or_path里面的模型
     if os.path.exists(args.model_name_or_path):
-        # set global_step to gobal_step of last saved checkpoint from model path
+        # 从model_name_or_path获取global_step
         global_step = int(args.model_name_or_path.split("-")[-1].split("/")[0])
+        #计算已经训练了多少epochs
         epochs_trained = global_step // (len(train_dataloader) // args.gradient_accumulation_steps)
+        #计算当前是第多少个训练epoch
         steps_trained_in_current_epoch = global_step % (len(train_dataloader) // args.gradient_accumulation_steps)
 
         logger.info("  Continuing training from checkpoint, will skip to saved global_step")
@@ -189,6 +214,7 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
         logger.info("  Will skip the first %d steps in the first epoch", steps_trained_in_current_epoch)
 
     tr_loss, logging_loss = 0.0, 0.0
+    #总的Epoch进度条
     train_iterator = trange(
         epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0]
     )
@@ -199,7 +225,7 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
     self_training_teacher_model = model
 
     for epoch in train_iterator:
-
+        # 每个epoch的进度条
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
 
@@ -207,50 +233,56 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
             if steps_trained_in_current_epoch > 0:
                 steps_trained_in_current_epoch -= 1
                 continue
-
+            #设置模型为train
             model.train()
+            # 放到GPU
             batch = tuple(t.to(args.device) for t in batch)
-
-            # Update labels periodically after certain begin step
+            # 在一定步骤之后定期更新label
             if global_step >= args.self_training_begin_step:
 
-                # Update a new teacher periodically
+                # 定期更新一个新的teacher模型
                 delta = global_step - args.self_training_begin_step
                 if delta % args.self_training_period == 0:
+                    # 满足更新条件，开始更新，拷贝一个模型作为教师模型
                     self_training_teacher_model = copy.deepcopy(model)
+                    #教师模型设置为评估
                     self_training_teacher_model.eval()
                     
-                    # Re-initialize the student model once a new teacher is obtained
+                    # 获得新teacher后，重新初始化student模型
                     if args.self_training_reinit:
                         model, optimizer, scheduler = initialize(args, model_class, config, t_total, epoch)
 
-                # Using current teacher to update the label
+                # 使用当前的teacher更新label
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
                 with torch.no_grad():
+                    # outputs:  (loss), logits, final_embedding, (hidden_states), (attentions)
                     outputs = self_training_teacher_model(**inputs)
-
                 label_mask = None
                 if args.self_training_label_mode == "hard":
+                    #直接用最大值位置索引作为硬标签
                     pred_labels = torch.argmax(outputs[0], axis=2)
                     pred_labels, label_mask = multi_source_label_refine(args,batch[5],batch[3],pred_labels,pad_token_label_id,pred_logits=outputs[0])
                 elif args.self_training_label_mode == "soft":
+                    #计算软标签
                     pred_labels = soft_frequency(logits=outputs[0], power=2)
-                    pred_labels, label_mask = multi_source_label_refine(args,batch[5],batch[3],pred_labels,pad_token_label_id)
-
+                    # combined_labels 用的是真实的labels, 根据self_training_hp_label 计算 pred_labels, label_mask
+                    pred_labels, label_mask = multi_source_label_refine(args=args,hp_labels=batch[5],combined_labels=batch[3],pred_labels=pred_labels,pad_token_label_id=pad_token_label_id)
+                # 使用teacher模型的输出pred_labels和label_mask作为我们模型的输入
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": pred_labels, "label_mask": label_mask}
             else:
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
-
+            # 如果不是distilbert，那么需要使用segment_ids，这里是token_type_ids作为key
             if args.model_type != "distilbert":
                 inputs["token_type_ids"] = (
                     batch[2] if args.model_type in ["bert", "xlnet"] else None
                 ) 
-
+            #输入到模型
             outputs = model(**inputs)
+            # 损失，logits和final_embeds，final_embeds是transformers 的roberta的输出
             loss, logits, final_embeds = outputs[0], outputs[1], outputs[2] # model outputs are always tuple in pytorch-transformers (see doc)
             mt_loss, vat_loss = 0, 0
 
-            # Mean teacher training scheme
+            # Mean teacher training scheme, 使用mean teacher的方法
             if args.mt and global_step % args.mt_updatefreq == 0:
                 update_step = global_step // args.mt_updatefreq
                 if update_step == 1:
@@ -276,7 +308,7 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
                 else:
                     mt_loss = get_mt_loss(logits, teacher_logits.detach(), args.mt_class, _lambda)
 
-            # Virtual adversarial training
+            # Virtual adversarial training, 使用VAT的方法
             if args.vat:
 
                 if args.model_type in ["roberta", "camembert", "xlmroberta"]:
@@ -306,7 +338,7 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
                         vat_loss = get_mt_loss(vat_final_embeds, final_embeds.detach(), args.mt_class, 1)
                     else:
                         vat_loss = get_mt_loss(vat_logits, logits.detach(), args.mt_class, 1)
-
+                    # 优化梯度
                     vat_embeds.grad = opt_grad(vat_loss, vat_embeds, optimizer)[0]
                     norm = vat_embeds.grad.norm()
 
@@ -331,20 +363,20 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
                         else:
                             vat_loss = get_mt_loss(vat_logits, logits.detach(), args.mt_class, args.vat_lambda) \
                                     + get_mt_loss(logits, vat_logits.detach(), args.mt_class, args.vat_lambda)
-
+            # 可以mt和vat一起使用，然后计算损失，也可以都不用
             loss = loss + args.mt_beta * mt_loss + args.vat_beta * vat_loss
             
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
-
+            #混合精度
             if args.fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
             else:
                 loss.backward()
-
+            # 把损失取出来，计算总损失
             tr_loss += loss.item()
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if args.fp16:
@@ -358,7 +390,7 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
                 global_step += 1
 
                 if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
-                    # Log metrics
+                    # 满足一定step，就记录日志
                     if args.evaluate_during_training:
 
                         logger.info("***** Entropy loss: %.4f, mean teacher loss : %.4f; vat loss: %.4f *****", \
@@ -402,11 +434,11 @@ def train(args, train_dataset, model_class, config, tokenizer, labels, pad_token
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar("loss", (tr_loss - logging_loss) / args.logging_steps, global_step)
                     logging_loss = tr_loss
-
+            # 判断是否迭代完成
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()
                 break
-
+        #判断epoch是否迭代完成
         if args.max_steps > 0 and global_step > args.max_steps:
             train_iterator.close()
             break
@@ -543,7 +575,7 @@ def main():
     parser.add_argument("--server_port", type=str, default="", help="For distant debugging.")
 
     # mean teacher
-    parser.add_argument('--mt', type = int, default = 0, help = 'mean teacher.')
+    parser.add_argument('--mt', type = int, default = 0, help = 'mean teacher. 是否使用mean teacher')
     parser.add_argument('--mt_updatefreq', type=int, default=1, help = 'mean teacher update frequency')
     parser.add_argument('--mt_class', type=str, default="kl", help = 'mean teacher class, choices:[smart, prob, logit, kl(default), distill].')
     parser.add_argument('--mt_lambda', type=float, default=1, help= "trade off parameter of the consistent loss.")
@@ -552,7 +584,7 @@ def main():
     parser.add_argument('--mt_alpha2', default=0.995, type=float, help="moving average parameter of mean teacher (for the exponential moving average).")
     parser.add_argument('--mt_beta', default=10, type=float, help="coefficient of mt_loss term.")
     parser.add_argument('--mt_avg', default="exponential", type=str, help="moving average method, choices:[exponentail(default), simple, double_ema].")
-    parser.add_argument('--mt_loss_type', default="logits", type=str, help="subject to measure model difference, choices:[embeds, logits(default)].")
+    parser.add_argument('--mt_loss_type', default="logits", type=str, help="subject to 衡量模型差异, choices:[embeds, logits(default)].")
 
     # virtual adversarial training
     parser.add_argument('--vat', type = int, default = 0, help = 'virtual adversarial training.')
@@ -562,10 +594,10 @@ def main():
     parser.add_argument('--vat_loss_type', default="logits", type=str, help="subject to measure model difference, choices = [embeds, logits(default)].")
 
     # self-training
-    parser.add_argument('--self_training_reinit', type = int, default = 0, help = '如果teacher模型已更新，重新初始化student模型。')
+    parser.add_argument('--self_training_reinit', type = int, default = 0, help = '如果teacher模型已更新，是否重新初始化student模型。0表示重启重新初始化，1表示不初始化')
     parser.add_argument('--self_training_begin_step', type = int, default = 900, help = '开始步骤(通常在第一个epoch之后)开始self-training。')
-    parser.add_argument('--self_training_label_mode', type = str, default = "hard", help = '伪标签类型. choices:[hard(default), soft].')
-    parser.add_argument('--self_training_period', type = int, default = 878, help = 'the self-training period.')
+    parser.add_argument('--self_training_label_mode', type = str, default = "hard", help = '伪标签类型. choices:[hard(default), soft]. 软标签是一个teacher模型预测出来的，类似logits的概率值，是浮点数，硬标签直接就是整数，就是对应概率最大的位置的索引，例如soft是0.82, hard就是1')
+    parser.add_argument('--self_training_period', type = int, default = 878, help = 'the self-training period., 每训练多少个step后，更新一下teacher模型')
     parser.add_argument('--self_training_hp_label', type = float, default = 0, help = 'use high precision label.')
     parser.add_argument('--self_training_ensemble_label', type = int, default = 0, help = 'use ensemble label.')
 
@@ -657,13 +689,16 @@ def main():
 
     # 开始训练
     if args.do_train:
+        #加载数据集
         train_dataset = load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode="train")
+        #开始训练模型
         model, global_step, tr_loss, best_dev, best_test = train(args, train_dataset, model_class, config, tokenizer, labels, pad_token_label_id)
+        #打印日志
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 
-    # Saving last-practice: if you use defaults names for the model, you can reload it using from_pretrained()
+    # 保存last-practice：如果您使用模型的默认名称，则可以使用from_pretrained()重新加载它
     if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        logger.info("Saving model checkpoint to %s", args.output_dir)
+        logger.info("保存模型 checkpoint to %s", args.output_dir)
         model_to_save = (
             model.module if hasattr(model, "module") else model
         )  # Take care of distributed/parallel training
@@ -672,7 +707,7 @@ def main():
         torch.save(args, os.path.join(args.output_dir, "training_args.bin"))
         torch.save(model.state_dict(), os.path.join(args.output_dir, "model.pt"))
 
-    # Evaluation
+    #评估模型
     results = {}
     if args.do_eval and args.local_rank in [-1, 0]:
         tokenizer = tokenizer_class.from_pretrained(args.output_dir, do_lower_case=args.do_lower_case)
@@ -682,7 +717,7 @@ def main():
                 os.path.dirname(c) for c in sorted(glob.glob(args.output_dir + "/**/" + WEIGHTS_NAME, recursive=True))
             )
             logging.getLogger("pytorch_transformers.modeling_utils").setLevel(logging.WARN)  # Reduce logging
-        logger.info("Evaluate the following checkpoints: %s", checkpoints)
+        logger.info("评估如下 checkpoints: %s", checkpoints)
 
         if not best_dev:
             best_dev = [0, 0, 0]
