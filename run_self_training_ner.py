@@ -74,7 +74,7 @@ ALL_MODELS = sum(
 # 这里roberta使用了自定义的model
 MODEL_CLASSES = {
     "bert": (BertConfig, BertForTokenClassification, BertTokenizer),
-    "roberta": (RobertaConfig, RobertaForTokenClassification_v2, RobertaTokenizer),
+    "roberta": (BertConfig, RobertaForTokenClassification_v2, BertTokenizer),
     "distilbert": (DistilBertConfig, DistilBertForTokenClassification, DistilBertTokenizer),
     "camembert": (CamembertConfig, CamembertForTokenClassification, CamembertTokenizer),
     "xlmroberta": (XLMRobertaConfig, XLMRobertaForTokenClassification, XLMRobertaTokenizer),

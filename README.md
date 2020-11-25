@@ -44,39 +44,17 @@ pip install -r requirements.txt
 ```
 
 ## Data
-我们在这里发布了五个开放域的远距离/弱标签的NER数据集: [dataset](dataset)
+对中文化妆品词识别和分类
+使用的robert模型是:https://github.com/ymcui/Chinese-BERT-wwm
+
+注意： 使用BertTokenizer以及BertModel加载，请勿使用RobertaTokenizer/RobertaModel！
 ```buildoutcfg
-一条数据的格式
-"str_words": ["EU", "rejects", "German", "call", "to", "boycott", "British", "lamb", "."], 
-"words": [0, 15473, 0, 590, 8, 3848, 0, 6233, 2], 
-"chars": [[31, 48], [6, 0, 52, 0, 12, 2, 7], [42, 0, 6, 14, 1, 3], [12, 1, 9, 9], [2, 5], [21, 5, 19, 12, 5, 2, 2], [36, 6, 4, 2, 4, 7, 11], [9, 1, 14, 21], [18]], 
-"tags": [2, 0, 0, 0, 0, 0, 0, 0, 0], 
-"defs": [null, null, null, null, null, null, null, null, null]}
-```
-### 这里只用到数据集中的部分字段:
-单条样本格式如下:
-```
-0 = {InputExample}
- guid = {str} '%s-%d'
- hp_labels = {list: 9} [None, None, None, None, None, None, None, None, None]   #如果存在高精度标签
- labels = {list: 9} [2, 0, 0, 0, 0, 0, 0, 0, 0]   #默认标签, 2代表着B-ORG，一个组织名字的开始，EU代表一个组织的名字
- words = {list: 9} ['EU', 'rejects', 'German', 'call', 'to', 'boycott', 'British', 'lamb', '.']
+#训练
+run_self_training_ner.py --data_dir dataset/cosmetics/ --model_type roberta --model_name_or_path hfl/chinese-roberta-wwm-ext --learning_rate 1e-5 --weight_decay 1e-4 --adam_epsilon 1e-8 --adam_beta1 0.9 --adam_beta2 0.98 --num_train_epochs 50 --warmup_steps 200 --per_gpu_train_batch_size 16 --per_gpu_eval_batch_size 32 --logging_steps 100 --save_steps 100000 --do_train --do_eval --do_predict --evaluate_during_training --output_dir outputs/cosmetics --cache_dir pretrained_model --seed 0 --max_seq_length 128 --overwrite_output_dir --self_training_reinit 0 --self_training_begin_step 1 --self_training_label_mode soft --self_training_period 1 --self_training_hp_label 5.9
 
-1 = {InputExample}
- guid = {str} '%s-%d'
- hp_labels = {list: 2} [None, None]
- labels = {list: 2} [3, 5]  # 代表B-MISC和I-MISC，  MISC是混杂项
- words = {list: 2} ['Peter', 'Blackburn']
-
-6 = {InputExample} 
- guid = {str} '%s-%d'
- hp_labels = {list: 25} [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
- labels = {list: 25} [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 7, 0]  代表 'European', 'Union' 是 B-ORG  I-ORG， 组织的开始和结束位置
- words = {list: 25} ['He', 'said', 'further', 'scientific', 'study', 'was', 'required', 'and', 'if', 'it', 'was', 'found', 'that', 'action', 'was', 'needed', 'it', 'should', 'be', 'taken', 'by', 'the', 'European', 'Union', '.']
-
-tag_to_id.json
-{"O": 0, "B-LOC": 1, "B-ORG": 2, "B-PER": 3, "B-MISC": 4, "I-PER": 5, "I-MISC": 6, "I-ORG": 7, "I-LOC": 8, "<START>": 9, "<STOP>": 10}
 ```
+
+
 ## Training & Evaluation
 
 我们提供了所有五个开放域的远距离/弱标签NER数据集的训练脚本 [scripts](scripts). 
