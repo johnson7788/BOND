@@ -52,8 +52,7 @@ pip install -r requirements.txt
 注意： 使用BertTokenizer以及BertModel加载，请勿使用RobertaTokenizer/RobertaModel！
 ```buildoutcfg
 #训练
-run_self_training_ner.py --data_dir dataset/cosmetics/ --model_type roberta --model_name_or_path hfl/chinese-roberta-wwm-ext --learning_rate 1e-5 --weight_decay 1e-4 --adam_epsilon 1e-8 --adam_beta1 0.9 --adam_beta2 0.98 --num_train_epochs 50 --warmup_steps 200 --per_gpu_train_batch_size 16 --per_gpu_eval_batch_size 32 --logging_steps 100 --save_steps 100000 --do_train --do_eval --do_predict --evaluate_during_training --output_dir outputs/cosmetics --cache_dir pretrained_model --seed 0 --max_seq_length 128 --overwrite_output_dir --self_training_reinit 0 --self_training_begin_step 1 --self_training_label_mode soft --self_training_period 1 --self_training_hp_label 5.9
-
+run_self_training_ner.py --data_dir dataset/cosmetics/ --model_type roberta --model_name_or_path hfl/chinese-roberta-wwm-ext --learning_rate 1e-5 --weight_decay 1e-4 --adam_epsilon 1e-8 --adam_beta1 0.9 --adam_beta2 0.98 --num_train_epochs 50 --warmup_steps 200 --per_gpu_train_batch_size 16 --per_gpu_eval_batch_size 32 --logging_steps 100 --save_steps 100000 --do_train --do_eval --do_predict --evaluate_during_training --output_dir outputs/cosmetics --cache_dir pretrained_model --seed 0 --max_seq_length 256 --overwrite_output_dir --self_training_reinit 0 --self_training_begin_step 900 --self_training_label_mode soft --self_training_period 450 --self_training_hp_label 5.9
 ```
 
 
