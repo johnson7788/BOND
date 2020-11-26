@@ -26,7 +26,19 @@ from flashtool import Logger
 logger = logging.getLogger(__name__)
 
 def evaluate(args, model, tokenizer, labels, pad_token_label_id, best, mode, prefix="", verbose=True):
-    
+    """
+    评估
+    :param args: argerpasse
+    :param model:  模型类
+    :param tokenizer: tokenizer类
+    :param labels:  eg: ['O', 'B-COM', 'I-COM', 'B-EFF', 'I-EFF', '<START>', '<STOP>']
+    :param pad_token_label_id:
+    :param best: 上次评估最好的结果，和这次评估比较，选择出最好的
+    :param mode: train or test or dev
+    :param prefix: 打印日志用，提示作用   eg: 'dev [Step 100/200.0 | Epoch 24/50.0]'
+    :param verbose: bool
+    :return:
+    """
     eval_dataset = load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode=mode)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
@@ -37,7 +49,7 @@ def evaluate(args, model, tokenizer, labels, pad_token_label_id, best, mode, pre
     if args.n_gpu > 1:
         model = torch.nn.DataParallel(model)
 
-    logger.info("***** Running evaluation %s *****", prefix)
+    logger.info("***** 开始 评估 %s *****", prefix)
     if verbose:
         logger.info("  Num examples = %d", len(eval_dataset))
         logger.info("  Batch size = %d", args.eval_batch_size)

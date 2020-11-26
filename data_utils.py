@@ -53,29 +53,26 @@ class InputFeatures(object):
 
 def read_examples_from_file(data_dir, mode):
     """
-    读取文件
+    读取文件, 我改成txt格式的了
     :param data_dir:  eg:  'dataset/conll03_distant/'
     :param mode: eg: train or test
     :return:
     """
-    file_path = os.path.join(data_dir, "{}.json".format(mode))
+    file_path = os.path.join(data_dir, "{}.txt".format(mode))
     #样本索引从1开始
     guid_index = 1
     #用于保存所有样本
     examples = []
 
     with open(file_path, 'r') as f:
-        data = json.load(f)
-        #迭代每条数据
-        for item in data:
-            words = item["str_words"]
-            labels = item["tags"]
-            # 是否存在高精度的high precision label
-            if "tags_hp" in labels:
-                hp_labels = item["tags_hp"]
-            else:
-                # 如果不存在，就设为None
-                hp_labels = [None]*len(labels)
+        while True:
+            ori_text = f.readline()
+            ori_labels = f.readline()
+            if not ori_labels:
+                break  # EOF
+            words = ori_text.split()
+            labels = ori_labels.split()
+            hp_labels = [None]*len(labels)
             examples.append(InputExample(guid=f"{mode}-{guid_index}", words=words, labels=labels, hp_labels=hp_labels))
             guid_index += 1
     
@@ -139,12 +136,14 @@ def convert_examples_to_features(
             # 单词tokenzier, 有的单词会被拆分，例如 Blackburn --> ["Black", "burn"]， 那么full_label_ids就会记录这个问题
             word_tokens = tokenizer.tokenize(word)
             tokens.extend(word_tokens)
+            # label标签转换成label_id
+            label_id = label_list.index(label)
             # 对word的第一个字使用真实的label id，后面其它的字，使用pad id. eg: ["Black", "burn"] --> [5, -100]
-            label_ids.extend([label] + [pad_token_label_id] * (len(word_tokens) - 1))
+            label_ids.extend([label_id] + [pad_token_label_id] * (len(word_tokens) - 1))
             # 如果hp_label是None，那么就使用pad_token_label_id, 否则就使用hp_label的一个真实id，然后其它用pad id  eg: ["Black", "burn"] -->[-100, -100]
             hp_label_ids.extend([hp_label if hp_label is not None else pad_token_label_id] + [pad_token_label_id] * (len(word_tokens) - 1))
             # 那么完全label: ["Black", "burn"] --> [5 5]
-            full_label_ids.extend([label] * len(word_tokens) )
+            full_label_ids.extend([label_id] * len(word_tokens) )
 
         # 特殊token等于3,如果sep_token_extra为True，因为roberta的特殊token是3个， Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
         special_tokens_count = 3 if sep_token_extra else 2
@@ -295,7 +294,7 @@ def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode, e
             pad_token_label_id=pad_token_label_id,
         )
         if args.local_rank in [-1, 0]:
-            logger.info("Saving features into cached file %s", cached_features_file)
+            logger.info("保存features到文件 %s", cached_features_file)
             torch.save(features, cached_features_file)
 
     if args.local_rank == 0 and not evaluate:
