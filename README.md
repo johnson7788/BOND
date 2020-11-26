@@ -45,7 +45,9 @@ pip install -r requirements.txt
 
 ## Data
 对中文化妆品词识别和分类
-使用的robert模型是:https://github.com/ymcui/Chinese-BERT-wwm
+使用的roberta模型是:https://github.com/ymcui/Chinese-BERT-wwm
+
+hfl/chinese-roberta-wwm-ext
 
 数据集: dataset/cosmetics
 
